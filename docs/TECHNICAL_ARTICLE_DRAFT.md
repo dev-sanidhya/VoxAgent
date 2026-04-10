@@ -223,6 +223,34 @@ def retry(operation, attempts=3, delay_seconds=1):
     raise last_error
 ```
 
+## Lightweight Model Benchmarking
+
+The assignment listed model benchmarking as an optional bonus, so I added a lightweight local comparison to guide the default setup instead of guessing.
+
+### STT benchmark
+
+I compared `base.en` and `small.en` on the same demo audio clip using CPU `int8` inference:
+
+| Model | Load Time (s) | Transcription Time (s) |
+| --- | ---: | ---: |
+| `base.en` | 1.494 | 1.523 |
+| `small.en` | 1.877 | 3.338 |
+
+Both models produced the same transcript on the sample, so `base.en` was the better default for this machine.
+
+### Ollama benchmark
+
+I also compared two locally available Ollama models on the same one-sentence summarization task:
+
+| Model | Response Time (s) |
+| --- | ---: |
+| `llama3.1:8b` | 41.447 |
+| `llama3.2:latest` | 61.164 |
+
+Based on that result, `llama3.1:8b` remained the default in the repository because it was materially faster in the local setup.
+
+The full benchmark note is available in the repository as `docs/MODEL_BENCHMARKS.md`.
+
 ## Challenges I Faced
 
 ### Running everything locally without making it painful
@@ -257,7 +285,6 @@ If I continue iterating on VoxAgent, the next improvements would be:
 - richer extraction of filenames and structured parameters
 - compound actions like “summarize this and save it to summary.txt”
 - stronger local templates for multiple programming languages
-- benchmarking different Whisper and Ollama combinations
 - better multi-step approval flows before execution
 
 ## Final Takeaway

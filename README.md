@@ -27,6 +27,7 @@ It also includes several bonus-oriented behaviors:
 - human-in-the-loop confirmation before file operations
 - graceful degradation when Ollama is unavailable
 - lightweight session memory
+- lightweight model benchmarking
 
 ## Tech Stack
 
@@ -52,7 +53,9 @@ It also includes several bonus-oriented behaviors:
 |   `-- ui.py
 |-- docs/
 |   |-- ARCHITECTURE.md
+|   |-- DEMO_VERIFICATION.md
 |   |-- DEMO_SCRIPT.md
+|   |-- MODEL_BENCHMARKS.md
 |   |-- SETUP.md
 |   `-- TECHNICAL_ARTICLE_DRAFT.md
 |-- history/
@@ -131,6 +134,7 @@ pytest -q
 - Setup notes: [docs/SETUP.md](docs/SETUP.md)
 - Demo script: [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md)
 - Demo verification: [docs/DEMO_VERIFICATION.md](docs/DEMO_VERIFICATION.md)
+- Model benchmarks: [docs/MODEL_BENCHMARKS.md](docs/MODEL_BENCHMARKS.md)
 - Technical article draft: [docs/TECHNICAL_ARTICLE_DRAFT.md](docs/TECHNICAL_ARTICLE_DRAFT.md)
 
 ## Hardware and Runtime Notes
