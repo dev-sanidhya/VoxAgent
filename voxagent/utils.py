@@ -12,6 +12,8 @@ def slugify_filename(raw_value: str, default_name: str = "generated.txt") -> str
 
 
 def ensure_output_path(output_dir: Path, file_name: str) -> Path:
+    if any(token in file_name for token in ("..", "/", "\\")):
+        raise ValueError("Only simple file or folder names are allowed inside output/.")
     safe_name = slugify_filename(file_name)
     target = (output_dir / safe_name).resolve()
     if output_dir.resolve() not in target.parents and target != output_dir.resolve():
