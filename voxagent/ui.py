@@ -27,6 +27,19 @@ def _render_history(history: list[dict]) -> None:
             st.caption(item.get("summary", ""))
 
 
+def _render_output_browser(output_dir: Path) -> None:
+    st.sidebar.header("Output Files")
+    files = sorted(path for path in output_dir.iterdir())
+    if not files:
+        st.sidebar.caption("No generated files yet.")
+        return
+
+    for path in files:
+        if path.name == ".gitkeep":
+            continue
+        st.sidebar.markdown(f"`{path.name}`")
+
+
 def _audio_from_input() -> tuple[bytes | None, str | None]:
     uploaded = st.file_uploader(
         "Upload an audio file",
@@ -87,6 +100,12 @@ def _render_results(response) -> None:
                 st.caption(result.path)
             if result.output:
                 st.code(result.output)
+                st.download_button(
+                    label=f"Download {result.intent} output",
+                    data=result.output,
+                    file_name=f"{result.intent}_output.txt",
+                    use_container_width=True,
+                )
 
 
 def run_app() -> None:
@@ -99,11 +118,18 @@ def run_app() -> None:
     st.caption("Voice-controlled local AI agent with speech-to-text, intent routing, and safe local tools.")
 
     _render_history(history)
+    _render_output_browser(settings.output_dir)
 
     with st.expander("Configuration", expanded=False):
         st.write(f"STT model: `{settings.whisper_model}`")
         st.write(f"LLM backend: `{settings.ollama_model}` via `{settings.ollama_base_url}`")
         st.write(f"Safe output directory: `{settings.output_dir}`")
+
+    with st.expander("Example Voice Commands", expanded=True):
+        st.write("Create a Python file named retry_helper.py with a retry decorator.")
+        st.write("Summarize this text: Transformers can transcribe speech and route actions locally.")
+        st.write("Create a folder named notes.")
+        st.write("Explain what this app can do.")
 
     approve = st.checkbox(
         "Approve file creation and code writing inside output/",
@@ -128,18 +154,51 @@ def run_app() -> None:
     with st.spinner("Transcribing audio and planning actions..."):
         response = agent.process_audio(audio_path=audio_path, approve_file_actions=approve)
 
-    left, right = st.columns([1.2, 1], gap="large")
+    overview, details = st.tabs(["Overview", "Execution Details"])
 
-    with left:
-        st.subheader("Transcribed Text")
-        st.write(response.transcript or "No text extracted.")
-        st.caption(f"STT backend: {response.stt_backend}")
-        st.caption(f"Planner backend: {response.llm_backend}")
-        _render_plan(response)
+    with overview:
+        left, right = st.columns([1.2, 1], gap="large")
 
-    with right:
-        _render_results(response)
-        if response.notes:
-            st.subheader("Notes")
-            for note in response.notes:
-                st.write(f"- {note}")
+        with left:
+            st.subheader("Transcribed Text")
+            st.write(response.transcript or "No text extracted.")
+            st.caption(f"STT backend: {response.stt_backend}")
+            st.caption(f"Planner backend: {response.llm_backend}")
+            _render_plan(response)
+
+        with right:
+            _render_results(response)
+            if response.notes:
+                st.subheader("Notes")
+                for note in response.notes:
+                    st.write(f"- {note}")
+
+    with details:
+        st.json(
+            {
+                "transcript": response.transcript,
+                "intents": response.intents,
+                "requires_confirmation": response.requires_confirmation,
+                "notes": response.notes,
+                "action_plan": [
+                    {
+                        "intent": action.intent,
+                        "target_file": action.target_file,
+                        "target_folder": action.target_folder,
+                        "language": action.language,
+                        "instruction": action.instruction,
+                    }
+                    for action in response.action_plan
+                ],
+                "action_results": [
+                    {
+                        "intent": result.intent,
+                        "status": result.status,
+                        "message": result.message,
+                        "path": result.path,
+                        "output": result.output,
+                    }
+                    for result in response.action_results
+                ],
+            }
+        )
