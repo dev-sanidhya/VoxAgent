@@ -21,7 +21,8 @@ class Settings:
     whisper_compute_type: str
     ollama_base_url: str
     ollama_model: str
-    request_timeout_seconds: int
+    planner_timeout_seconds: int
+    generation_timeout_seconds: int
 
 
 def get_settings() -> Settings:
@@ -37,10 +38,11 @@ def get_settings() -> Settings:
         output_dir=output_dir,
         history_dir=history_dir,
         history_file=history_file,
-        whisper_model=os.getenv("WHISPER_MODEL", "small.en"),
+        whisper_model=os.getenv("WHISPER_MODEL", "base.en"),
         whisper_device=os.getenv("WHISPER_DEVICE", "cpu"),
         whisper_compute_type=os.getenv("WHISPER_COMPUTE_TYPE", "int8"),
         ollama_base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
         ollama_model=os.getenv("OLLAMA_MODEL", "llama3.1:8b"),
-        request_timeout_seconds=int(os.getenv("REQUEST_TIMEOUT_SECONDS", "120")),
+        planner_timeout_seconds=int(os.getenv("PLANNER_TIMEOUT_SECONDS", "20")),
+        generation_timeout_seconds=int(os.getenv("GENERATION_TIMEOUT_SECONDS", "45")),
     )

@@ -22,6 +22,7 @@ class ActionResult:
     message: str
     output: str | None = None
     path: str | None = None
+    backend: str | None = None
 
 
 @dataclass
@@ -34,6 +35,7 @@ class AgentResponse:
     stt_backend: str
     requires_confirmation: bool = False
     notes: list[str] = field(default_factory=list)
+    timings: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass

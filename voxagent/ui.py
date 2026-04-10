@@ -30,14 +30,14 @@ def _render_history(history: list[dict]) -> None:
 def _render_output_browser(output_dir: Path) -> None:
     st.sidebar.header("Output Files")
     files = sorted(path for path in output_dir.iterdir())
-    if not files:
+    visible_files = [path for path in files if path.name not in {".gitkeep", "__pycache__"}]
+    if not visible_files:
         st.sidebar.caption("No generated files yet.")
         return
 
-    for path in files:
-        if path.name == ".gitkeep":
-            continue
-        st.sidebar.markdown(f"`{path.name}`")
+    for path in visible_files:
+        label = f"{path.name}/" if path.is_dir() else path.name
+        st.sidebar.markdown(f"`{label}`")
 
 
 def _audio_from_input() -> tuple[bytes | None, str | None]:
@@ -65,10 +65,7 @@ def _audio_from_input() -> tuple[bytes | None, str | None]:
 
 def _render_plan(response) -> None:
     st.subheader("Detected Intent")
-    if response.intents:
-        st.write(", ".join(response.intents))
-    else:
-        st.write("No intent detected")
+    st.write(", ".join(response.intents) if response.intents else "No intent detected")
 
     st.subheader("Planned Actions")
     if not response.action_plan:
@@ -80,6 +77,8 @@ def _render_plan(response) -> None:
             st.markdown(f"**Step {index}:** `{action.intent}`")
             if action.target_file:
                 st.write(f"Target file: `{action.target_file}`")
+            if action.target_folder:
+                st.write(f"Target folder: `{action.target_folder}`")
             if action.language:
                 st.write(f"Language: `{action.language}`")
             if action.instruction:
@@ -96,6 +95,8 @@ def _render_results(response) -> None:
         with st.container(border=True):
             st.markdown(f"**{result.intent}**")
             st.write(result.message)
+            if result.backend:
+                st.caption(f"Execution backend: {result.backend}")
             if result.path:
                 st.caption(result.path)
             if result.output:
@@ -113,7 +114,7 @@ def run_app() -> None:
     agent = VoiceAgent(settings)
     history = agent.history_store.load()
 
-    st.set_page_config(page_title="VoxAgent", page_icon="🎙️", layout="wide")
+    st.set_page_config(page_title="VoxAgent", page_icon="VA", layout="wide")
     st.title("VoxAgent")
     st.caption("Voice-controlled local AI agent with speech-to-text, intent routing, and safe local tools.")
 
@@ -151,8 +152,11 @@ def run_app() -> None:
         return
 
     audio_path = write_temp_audio(audio_bytes, suffix or ".wav")
-    with st.spinner("Transcribing audio and planning actions..."):
-        response = agent.process_audio(audio_path=audio_path, approve_file_actions=approve)
+    try:
+        with st.spinner("Transcribing audio and planning actions..."):
+            response = agent.process_audio(audio_path=audio_path, approve_file_actions=approve)
+    finally:
+        Path(audio_path).unlink(missing_ok=True)
 
     overview, details = st.tabs(["Overview", "Execution Details"])
 
@@ -164,6 +168,13 @@ def run_app() -> None:
             st.write(response.transcript or "No text extracted.")
             st.caption(f"STT backend: {response.stt_backend}")
             st.caption(f"Planner backend: {response.llm_backend}")
+            if response.timings:
+                st.caption(
+                    " | ".join(
+                        f"{label.replace('_', ' ')}: {value:.2f}s"
+                        for label, value in response.timings.items()
+                    )
+                )
             _render_plan(response)
 
         with right:
@@ -180,6 +191,7 @@ def run_app() -> None:
                 "intents": response.intents,
                 "requires_confirmation": response.requires_confirmation,
                 "notes": response.notes,
+                "timings": response.timings,
                 "action_plan": [
                     {
                         "intent": action.intent,
@@ -197,6 +209,7 @@ def run_app() -> None:
                         "message": result.message,
                         "path": result.path,
                         "output": result.output,
+                        "backend": result.backend,
                     }
                     for result in response.action_results
                 ],

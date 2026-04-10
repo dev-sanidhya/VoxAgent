@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from datetime import datetime, timezone
+from time import perf_counter
 
 import requests
 
@@ -22,7 +23,9 @@ class VoiceAgent:
         self.fallback_planner = LocalFallbackPlanner()
 
     def process_audio(self, audio_path: str, approve_file_actions: bool = False) -> AgentResponse:
+        started = perf_counter()
         transcript, stt_backend = self.stt_service.transcribe(audio_path)
+        stt_elapsed = perf_counter() - started
         if not transcript:
             return AgentResponse(
                 transcript="",
@@ -32,8 +35,10 @@ class VoiceAgent:
                 llm_backend=self.llm_client.backend_name,
                 stt_backend=stt_backend,
                 notes=["No transcript could be extracted from the provided audio."],
+                timings={"transcription_seconds": round(stt_elapsed, 3)},
             )
 
+        plan_started = perf_counter()
         try:
             planned = self.llm_client.plan_actions(transcript)
             action_plan = [ActionRequest(**action.model_dump()) for action in planned.actions]
@@ -43,9 +48,11 @@ class VoiceAgent:
                 intent in {"create_file", "write_code"} for intent in intents
             )
             llm_backend = self.llm_client.backend_name
-        except (requests.RequestException, ValueError):
+        except (requests.RequestException, ValueError) as error:
             action_plan, intents, notes, requires_confirmation = self.fallback_planner.plan(transcript)
+            notes.append(f"Planner fallback reason: {type(error).__name__}")
             llm_backend = "rule-based-fallback"
+        planning_elapsed = perf_counter() - plan_started
 
         action_results = []
         executor = ToolExecutor(self.settings, self.llm_client)
@@ -53,20 +60,13 @@ class VoiceAgent:
             action.intent in {"create_file", "write_code"} for action in action_plan
         )
 
+        execution_started = perf_counter()
         if file_operation_requested and not approve_file_actions:
             notes.append("Execution paused until the UI confirmation checkbox is enabled.")
         else:
             for action in action_plan:
-                try:
-                    action_results.append(executor.execute(action))
-                except requests.RequestException as error:
-                    action_results.append(
-                        ActionResult(
-                            intent="general_chat",
-                            status="failed",
-                            message=f"Tool execution failed because the LLM backend was unavailable: {error}",
-                        )
-                    )
+                action_results.append(executor.execute(action))
+        execution_elapsed = perf_counter() - execution_started
 
         response = AgentResponse(
             transcript=transcript,
@@ -77,6 +77,11 @@ class VoiceAgent:
             stt_backend=stt_backend,
             requires_confirmation=requires_confirmation,
             notes=notes,
+            timings={
+                "transcription_seconds": round(stt_elapsed, 3),
+                "planning_seconds": round(planning_elapsed, 3),
+                "execution_seconds": round(execution_elapsed, 3),
+            },
         )
         self._persist_history(response)
         return response

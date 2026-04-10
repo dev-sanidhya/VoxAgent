@@ -130,6 +130,7 @@ pytest -q
 - Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - Setup notes: [docs/SETUP.md](docs/SETUP.md)
 - Demo script: [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md)
+- Demo verification: [docs/DEMO_VERIFICATION.md](docs/DEMO_VERIFICATION.md)
 - Technical article draft: [docs/TECHNICAL_ARTICLE_DRAFT.md](docs/TECHNICAL_ARTICLE_DRAFT.md)
 
 ## Hardware and Runtime Notes
@@ -137,6 +138,8 @@ pytest -q
 - The default STT configuration is optimized for CPU usage.
 - If the Whisper model is too slow on your hardware, switch to a smaller model such as `base.en`.
 - If compressed uploaded audio formats fail on your machine, install ffmpeg locally.
+- Intent planning uses a shorter timeout than long-form generation so the UI can fall back faster if Ollama stalls.
+- Long-form generation also uses a bounded timeout so code or summary requests do not block the UI indefinitely.
 - This implementation stays local-first. No API-based STT workaround was required in the repository version.
 
 ## Deliverables Status

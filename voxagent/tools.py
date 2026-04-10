@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import requests
+
 from voxagent.config import Settings
+from voxagent.fallback import LocalFallbackResponder
 from voxagent.models import ActionRequest, ActionResult
 from voxagent.utils import ensure_output_path
 
@@ -11,6 +14,7 @@ class ToolExecutor:
     def __init__(self, settings: Settings, llm_client) -> None:
         self.settings = settings
         self.llm_client = llm_client
+        self.fallback = LocalFallbackResponder()
 
     def execute(self, action: ActionRequest) -> ActionResult:
         if action.intent == "create_file":
@@ -36,6 +40,7 @@ class ToolExecutor:
                 status="success",
                 message=f"Created folder {target_folder.name} in output/.",
                 path=str(target_folder),
+                backend="filesystem",
             )
 
         file_name = action.target_file or "new_file.txt"
@@ -47,6 +52,7 @@ class ToolExecutor:
             status="success",
             message=f"Created file {target_path.name} in output/.",
             path=str(target_path),
+            backend="filesystem",
         )
 
     def _write_code(self, action: ActionRequest) -> ActionResult:
@@ -54,11 +60,20 @@ class ToolExecutor:
         instruction = action.instruction or "Create a starter file."
         target_path = ensure_output_path(self.settings.output_dir, file_name)
         target_path.parent.mkdir(parents=True, exist_ok=True)
-        code = self.llm_client.generate_code(
-            instruction=instruction,
-            language=action.language or "python",
-            file_name=target_path.name,
-        )
+        backend = "ollama"
+        try:
+            code = self.llm_client.generate_code(
+                instruction=instruction,
+                language=action.language or "python",
+                file_name=target_path.name,
+            )
+        except requests.RequestException:
+            code = self.fallback.generate_code(
+                instruction=instruction,
+                language=action.language or "python",
+                file_name=target_path.name,
+            )
+            backend = "local-fallback"
         target_path.write_text(code.rstrip() + "\n", encoding="utf-8")
         return ActionResult(
             intent=action.intent,
@@ -66,6 +81,7 @@ class ToolExecutor:
             message=f"Wrote generated {action.language or 'code'} to {target_path.name}.",
             output=code,
             path=str(target_path),
+            backend=backend,
         )
 
     def _summarize(self, action: ActionRequest) -> ActionResult:
@@ -75,23 +91,36 @@ class ToolExecutor:
                 intent=action.intent,
                 status="failed",
                 message="No text was provided to summarize.",
+                backend="local-validation",
             )
-        summary = self.llm_client.summarize(text)
+        backend = "ollama"
+        try:
+            summary = self.llm_client.summarize(text)
+        except requests.RequestException:
+            summary = self.fallback.summarize(text)
+            backend = "local-fallback"
         return ActionResult(
             intent=action.intent,
             status="success",
             message="Created a text summary.",
             output=summary,
+            backend=backend,
         )
 
     def _chat(self, action: ActionRequest) -> ActionResult:
         prompt = action.instruction or action.chat_response_hint or "Respond to the user."
-        response = self.llm_client.chat(prompt)
+        backend = "ollama"
+        try:
+            response = self.llm_client.chat(prompt)
+        except requests.RequestException:
+            response = self.fallback.chat(prompt)
+            backend = "local-fallback"
         return ActionResult(
             intent=action.intent,
             status="success",
             message="Generated a chat response.",
             output=response,
+            backend=backend,
         )
 
 

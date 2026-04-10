@@ -45,7 +45,7 @@ class OllamaClient:
                     {"role": "user", "content": user_prompt},
                 ],
             },
-            timeout=self.settings.request_timeout_seconds,
+            timeout=self.settings.planner_timeout_seconds,
         )
         response.raise_for_status()
         payload = response.json()
@@ -63,7 +63,7 @@ class OllamaClient:
                     {"role": "user", "content": user_prompt},
                 ],
             },
-            timeout=self.settings.request_timeout_seconds,
+            timeout=self.settings.generation_timeout_seconds,
         )
         response.raise_for_status()
         payload = response.json()
